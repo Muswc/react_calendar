@@ -1,4 +1,4 @@
-# 캘린더 앱<https://muswc.github.io/react_calendar>
+# [캘린더 앱](https://muswc.github.io/react_calendar)
 
 ![스크린샷](screenshot.png)
 
