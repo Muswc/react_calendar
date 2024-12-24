@@ -6,48 +6,34 @@ const Weather = () => {
   const [error, setError] = useState(null);
   const [showPermissionButton, setShowPermissionButton] = useState(false);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log("위치 정보 획득 성공:", position);
-          const { latitude, longitude } = position.coords;
-          getWeatherData(latitude, longitude);
-        },
-        (error) => {
-          console.error("위치 정보 획득 실패:", error);
-          setShowPermissionButton(true);
-          setLoading(false);
-
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              setError("위치 정보 접근이 거부되었습니다. 다시 시도해주세요.");
-              break;
-            case error.POSITION_UNAVAILABLE:
-              setError("위치 정보를 사용할 수 없습니다");
-              break;
-            case error.TIMEOUT:
-              setError("위치 정보 요청 시간이 초과되었습니다");
-              break;
-            default:
-              setError("위치 정보를 가져오는데 실패했습니다");
-          }
-        },
-        {
-          maximumAge: 0,
-          timeout: 5000
-        }
-      );
-    } else {
-      setError("이 브라우저에서는 위치 정보를 지원하지 않습니다");
+  const checkPermissionAndGetLocation = async () => {
+    try {
+      if (!navigator.geolocation) {
+        throw new Error("이 브라우저에서는 위치 정보를 지원하지 않습니다");
+      }
+      
+      setShowPermissionButton(true);
+      setLoading(false);
+      
+    } catch (error) {
+      console.error("위치 정보 처리 중 오류:", error);
+      setError(error.message);
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    console.log('현재 프로토콜:', window.location.protocol);
+    
+    checkPermissionAndGetLocation();
   }, []);
 
   const getWeatherData = async (latitude, longitude) => {
     try {
-      const API_KEY = "64a7ed474b36514b8f39c5709835817f";
-      console.log("API KEY:", API_KEY);
+      const API_KEY = process.env.REACT_APP_WEATHER_API_KEY;
+      if (!API_KEY) {
+        throw new Error('날씨 API 키가 설정되지 않았습니다');
+      }
       
       const response = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric&lang=kr`
@@ -60,7 +46,6 @@ const Weather = () => {
       }
 
       const data = await response.json();
-      console.log("날씨 데이터:", data);
       setWeather({
         temp: Math.round(data.main.temp),
         description: data.weather[0].description,
@@ -68,6 +53,7 @@ const Weather = () => {
         location: data.name
       });
       setLoading(false);
+      setShowPermissionButton(false);
     } catch (err) {
       console.error('날씨 데이터 요청 실패:', err);
       setError('날씨 정보를 가져오는데 실패했습니다');
@@ -75,23 +61,27 @@ const Weather = () => {
     }
   };
 
-  const requestLocationPermission = () => {
+  const requestLocationPermission = async () => {
     setLoading(true);
-    setShowPermissionButton(false);
     setError(null);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          getWeatherData(latitude, longitude);
-        },
-        (error) => {
-          setShowPermissionButton(true);
-          setLoading(false);
-          setError("위치 정보 접근이 거부되었습니다. 다시 시도해주세요.");
-        }
-      );
+    
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 5000
+        });
+      });
+      
+      console.log('위치 정보 획득 성공:', position.coords);
+      const { latitude, longitude } = position.coords;
+      await getWeatherData(latitude, longitude);
+      
+    } catch (error) {
+      console.error("위치 정보 처리 중 오류:", error);
+      setError(error.message || "위치 정보를 가져오는데 실패했습니다");
+      setLoading(false);
     }
   };
 
@@ -101,7 +91,11 @@ const Weather = () => {
         <h3>오늘의 날씨는?</h3>
         <div className="weather-prompt">
           <p>날씨 정보를 보려면 위치 권한이 필요합니다</p>
-          <button onClick={requestLocationPermission} className="location-button">
+          <button 
+            onClick={requestLocationPermission} 
+            className="location-button"
+            style={{ cursor: 'pointer' }}
+          >
             위치 권한 허용하기
           </button>
         </div>
@@ -123,6 +117,13 @@ const Weather = () => {
       <div className="weather-widget">
         <h3>오늘의 날씨는?</h3>
         <div className="weather-error">{error}</div>
+        <button 
+          onClick={requestLocationPermission} 
+          className="location-button"
+          style={{ marginTop: '10px', cursor: 'pointer' }}
+        >
+          다시 시도하기
+        </button>
       </div>
     );
   }
@@ -136,7 +137,7 @@ const Weather = () => {
       {weather && (
         <div className="weather-info">
           <img 
-            src={`http://openweathermap.org/img/wn/${weather.icon}.png`}
+            src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
             alt={weather.description}
           />
           <span className="temp">{weather.temp}°C</span>
