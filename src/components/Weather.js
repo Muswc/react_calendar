@@ -68,9 +68,9 @@ const Weather = () => {
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 5000
+          enableHighAccuracy: false,
+          maximumAge: 30000,
+          timeout: 10000             
         });
       });
       
